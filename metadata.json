@@ -1,0 +1,6 @@
+{
+  "name": "DuskLore Shorts",
+  "description": "Avtomatlashtirilgan mistik va xalq afsonalari uslubidagi 15 soniyalik inglizcha Horror AI YouTube Shorts studiyasi",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

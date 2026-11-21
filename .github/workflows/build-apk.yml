@@ -1,0 +1,78 @@
+name: Build DuskLore Shorts APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Accept Android SDK licenses
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          fi
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Restore project debug keystore
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+            echo "Restored debug.keystore from debug.keystore.base64"
+          elif [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v -keystore debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            echo "Generated fallback debug.keystore on runner"
+          fi
+
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Stage APK artifact
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DuskLore-Shorts.apk
+          ls -lh dist/DuskLore-Shorts.apk
+
+      - name: Upload APK to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DuskLore-Shorts-APK
+          path: dist/DuskLore-Shorts.apk
+          retention-days: 30
+
+      - name: Publish APK to GitHub Releases (latest-apk)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="latest-apk"
+          NOTES="DuskLore Shorts (Android APK) — avtomatik yig'ildi (${{ github.sha }}). Telefoningizga o'rnatish uchun pastdagi DuskLore-Shorts.apk faylini yuklab oling."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/DuskLore-Shorts.apk --clobber
+            gh release edit "$TAG" --title "DuskLore Shorts — Latest Android APK" --notes "$NOTES"
+          else
+            gh release create "$TAG" dist/DuskLore-Shorts.apk \
+              --title "DuskLore Shorts — Latest Android APK" \
+              --notes "$NOTES" \
+              --latest
+          fi

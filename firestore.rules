@@ -1,0 +1,153 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened primitive helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidShortStatus(status) {
+      return status is string && status in ['GENERATING', 'READY', 'UPLOADING', 'SCHEDULED', 'PUBLISHED', 'FAILED'];
+    }
+
+    function isValidShortProject(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.folkloreTheme is string && data.folkloreTheme.size() >= 1 && data.folkloreTheme.size() <= 80 &&
+             data.youtubeTitle is string && data.youtubeTitle.size() >= 1 && data.youtubeTitle.size() <= 100 &&
+             data.youtubeDescription is string && data.youtubeDescription.size() >= 1 && data.youtubeDescription.size() <= 1500 &&
+             data.hashtags is list && data.hashtags.size() <= 15 && (data.hashtags.size() == 0 || data.hashtags[0] is string) &&
+             data.scenes is list && data.scenes.size() <= 6 && (data.scenes.size() == 0 || data.scenes[0] is map) &&
+             isValidShortStatus(data.status) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('localVideoPath' in data) || data.localVideoPath == null || (data.localVideoPath is string && data.localVideoPath.size() <= 500)) &&
+             (!('localThumbPath' in data) || data.localThumbPath == null || (data.localThumbPath is string && data.localThumbPath.size() <= 500)) &&
+             (!('scheduledPublishAtIso' in data) || data.scheduledPublishAtIso == null || (data.scheduledPublishAtIso is string && data.scheduledPublishAtIso.size() <= 64)) &&
+             (!('youtubeVideoId' in data) || data.youtubeVideoId == null || (data.youtubeVideoId is string && data.youtubeVideoId.size() <= 64)) &&
+             (!('errorMessage' in data) || data.errorMessage == null || (data.errorMessage is string && data.errorMessage.size() <= 500)) &&
+             (!('durationSeconds' in data) || data.durationSeconds == null || (data.durationSeconds is int && data.durationSeconds >= 5 && data.durationSeconds <= 60));
+    }
+
+    function isValidAutomationSchedule(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.autoEnabled is bool &&
+             data.publishHour is int && data.publishHour >= 0 && data.publishHour <= 23 &&
+             data.publishMinute is int && data.publishMinute >= 0 && data.publishMinute <= 59 &&
+             data.defaultFolkloreCategory is string && data.defaultFolkloreCategory.size() >= 1 && data.defaultFolkloreCategory.size() <= 80 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('autoUploadPrivacy' in data) || data.autoUploadPrivacy == null || (data.autoUploadPrivacy is string && data.autoUploadPrivacy in ['private', 'public', 'unlisted'])) &&
+             (!('connectedChannelTitle' in data) || data.connectedChannelTitle == null || (data.connectedChannelTitle is string && data.connectedChannelTitle.size() <= 120)) &&
+             (!('connectedChannelId' in data) || data.connectedChannelId == null || (data.connectedChannelId is string && data.connectedChannelId.size() <= 120)) &&
+             (!('lastRunStatus' in data) || data.lastRunStatus == null || (data.lastRunStatus is string && data.lastRunStatus.size() <= 300)) &&
+             (!('lastRunAtIso' in data) || data.lastRunAtIso == null || (data.lastRunAtIso is string && data.lastRunAtIso.size() <= 64));
+    }
+
+    // User-scoped Horror Shorts episodes
+    match /users/{userId}/shorts/{shortId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(shortId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(shortId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'folkloreTheme', 'youtubeTitle', 'youtubeDescription',
+                         'hashtags', 'scenes', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'folkloreTheme', 'youtubeTitle', 'youtubeDescription',
+                         'hashtags', 'scenes', 'status', 'localVideoPath', 'localThumbPath',
+                         'scheduledPublishAtIso', 'youtubeVideoId', 'errorMessage',
+                         'durationSeconds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidShortProject(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(shortId) &&
+                       isValidShortProject(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       existing().status != 'PUBLISHED' && (
+                         // Action 1: Edit YouTube SEO metadata
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'youtubeTitle', 'youtubeDescription', 'hashtags', 'updatedAt'
+                         ]) ||
+                         // Action 2: Pipeline render / YouTube upload state transition
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'status', 'localVideoPath', 'localThumbPath',
+                           'scheduledPublishAtIso', 'youtubeVideoId', 'errorMessage',
+                           'durationSeconds', 'scenes', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(shortId);
+    }
+
+    // User-scoped Daily 7:00 Automation Schedule & YouTube Channel Config
+    match /users/{userId}/settings/{settingId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(settingId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(settingId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'autoEnabled', 'publishHour', 'publishMinute',
+                         'defaultFolkloreCategory', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'autoEnabled', 'publishHour', 'publishMinute',
+                         'defaultFolkloreCategory', 'autoUploadPrivacy',
+                         'connectedChannelTitle', 'connectedChannelId',
+                         'lastRunStatus', 'lastRunAtIso', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidAutomationSchedule(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(settingId) &&
+                       isValidAutomationSchedule(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+                         // Action 1: Update daily 7:00 schedule preferences
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'autoEnabled', 'publishHour', 'publishMinute',
+                           'defaultFolkloreCategory', 'autoUploadPrivacy', 'updatedAt'
+                         ]) ||
+                         // Action 2: Update connected YouTube channel or automated run log
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'connectedChannelTitle', 'connectedChannelId',
+                           'lastRunStatus', 'lastRunAtIso', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(settingId);
+    }
+  }
+}

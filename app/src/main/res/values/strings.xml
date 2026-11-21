@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">DuskLore Shorts</string>
+    <string name="auth_tagline">Mistik Xalq Afsonalari • 15s AI Horror Shorts</string>
+    <string name="auth_subtitle">Har kuni soat 7:00 da Amerika ingliz tilidagi qo\'rqinchli Shorts videolarni avtomatik yarating va YouTube\'ga joylang.</string>
+    <string name="auth_google_button">Google orqali kirish</string>
+    <string name="nav_studio">Studiya</string>
+    <string name="nav_archive">Arxiv</string>
+    <string name="nav_schedule">Avto-Reja</string>
+    <string name="cd_hero_banner">Tungi o\'rmon chorrahasidagi qizil fonus</string>
+    <string name="cd_short_poster">Yaratilgan Horror Short muqovasi</string>
+    <string name="cd_back">Orqaga qaytish</string>
+    <string name="cd_play_pause">Ijro etish yoki to\'xtatish</string>
+    <string name="cd_delete_short">Loyihani o\'chirish</string>
+    <string name="cd_share_video">Videoni ulashish</string>
+    <string name="cd_sign_out">Hisobdan chiqish</string>
+</resources>

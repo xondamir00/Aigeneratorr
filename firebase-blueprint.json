@@ -1,0 +1,166 @@
+{
+  "entities": {
+    "HorrorShortProject": {
+      "title": "HorrorShortProject",
+      "description": "A generated 15-second mystical folklore horror YouTube Short with American English script, scenes, SEO metadata, local render path, and YouTube upload status.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "folkloreTheme": {
+          "type": "string",
+          "description": "Mystical folklore sub-genre or prompt theme"
+        },
+        "youtubeTitle": {
+          "type": "string",
+          "description": "American English YouTube Shorts title with #Shorts"
+        },
+        "youtubeDescription": {
+          "type": "string",
+          "description": "American English YouTube Shorts description"
+        },
+        "hashtags": {
+          "type": "array",
+          "description": "Bounded list of YouTube hashtags (max 15)"
+        },
+        "scenes": {
+          "type": "array",
+          "description": "List of 4 timed horror scenes with narration, subtitle, imagePrompt, cameraMotion, durationMs"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["GENERATING", "READY", "UPLOADING", "SCHEDULED", "PUBLISHED", "FAILED"],
+          "description": "Pipeline and YouTube upload lifecycle state"
+        },
+        "localVideoPath": {
+          "type": "string",
+          "description": "Device-local rendered 15-second MP4 path"
+        },
+        "localThumbPath": {
+          "type": "string",
+          "description": "Device-local poster image path"
+        },
+        "scheduledPublishAtIso": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp for 7:00 YouTube publishAt scheduling"
+        },
+        "youtubeVideoId": {
+          "type": "string",
+          "description": "Uploaded YouTube video ID returned by YouTube Data API v3"
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Last generation or upload error message if any"
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Rendered Short duration in seconds (default 15)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (client submits FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp (client submits FieldValue.serverTimestamp())"
+        }
+      },
+      "required": [
+        "userId",
+        "folkloreTheme",
+        "youtubeTitle",
+        "youtubeDescription",
+        "hashtags",
+        "scenes",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AutomationSchedule": {
+      "title": "AutomationSchedule",
+      "description": "Per-user daily 7:00 YouTube automation settings and connected YouTube channel metadata.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "autoEnabled": {
+          "type": "boolean",
+          "description": "Whether daily automated generation and 7:00 YouTube upload is active"
+        },
+        "publishHour": {
+          "type": "integer",
+          "description": "Scheduled local publish hour (19 for 7:00 PM or 7 for 7:00 AM)"
+        },
+        "publishMinute": {
+          "type": "integer",
+          "description": "Scheduled local publish minute (default 0)"
+        },
+        "defaultFolkloreCategory": {
+          "type": "string",
+          "description": "Default mystical folklore category for automated daily runs"
+        },
+        "autoUploadPrivacy": {
+          "type": "string",
+          "enum": ["private", "public", "unlisted"],
+          "description": "Privacy mode when publishing immediately or scheduling"
+        },
+        "connectedChannelTitle": {
+          "type": "string",
+          "description": "Connected YouTube channel title fetched from YouTube Data API v3"
+        },
+        "connectedChannelId": {
+          "type": "string",
+          "description": "Connected YouTube channel ID"
+        },
+        "lastRunStatus": {
+          "type": "string",
+          "description": "Summary of the most recent automated run"
+        },
+        "lastRunAtIso": {
+          "type": "string",
+          "description": "ISO timestamp of the most recent automated run"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (client submits FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp (client submits FieldValue.serverTimestamp())"
+        }
+      },
+      "required": [
+        "userId",
+        "autoEnabled",
+        "publishHour",
+        "publishMinute",
+        "defaultFolkloreCategory",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/shorts/{shortId}": {
+      "schema": {
+        "$ref": "#/entities/HorrorShortProject"
+      },
+      "description": "User-owned generated 15-second Folklore Horror Shorts projects and YouTube upload logs."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": {
+        "$ref": "#/entities/AutomationSchedule"
+      },
+      "description": "User-owned daily 7:00 YouTube automation schedule and channel settings."
+    }
+  }
+}
